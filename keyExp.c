@@ -3,8 +3,13 @@
 // Description : Key Expansion step of AES Algorithm
 #include<stdio.h>
 #include<stdlib.h>	
-#define DEBUG2
 /**********************************************************/
+
+/*  This function is used by key expansion method and g
+ *	It returns the sbox substitution for "byte"
+ *  Input : byte : the byte whose sbox value is required
+ *  Output : sbox value
+ */
 unsigned char sbox(unsigned char byte){
 	unsigned char s[256] = 	
 	{
@@ -28,58 +33,52 @@ unsigned char sbox(unsigned char byte){
 	return s[byte];	
 }
 /**********************************************************/
-// iteration starts with zero
+/*  This function is used by key expansion method
+ *	It performs following transformations on a word
+ *		1. One Byte Left circular rotation
+ *		2. Byte Substitution using sbox
+ *		3. XOR first byte with RCON Value
+ *  Input:  word : 4 byte array of bytes 
+ *			iteration: function uses rcon value which depends on iteration value
+ *			NOTE: iteration value starts with zero 
+ *	Output: void , operations are carried out on word itself
+*/
 void g(unsigned char *word, int iteration){ 
 	int i;
 	//-------------- One byte left circular rotation-----------
-	#ifdef DEBUG
-		printf("\nTesting rotation..");
-		for(i=0;i<4;i++){
-			printf(" %2x ",word[i]);
-		}
-	#endif
 	unsigned char tmp = word[0];
 	word[0]=word[1];
 	word[1]=word[2];
 	word[2]=word[3];
 	word[3]=tmp;
-	#ifdef DEBUG
-	printf("\nAfter Rotation...");
-		for(i=0;i<4;i++){
-			printf(" %2x ",word[i]);
-		}
-	#endif
 	//-------------- Byte Substitution by the same lookup table as used in Sub Bytes step-----------
 	for(i=0;i<4;i++){
 		word[i]= sbox(word[i]);
 	}
-	#ifdef DEBUG
-	printf("\nSBOX...");
-		for(i=0;i<4;i++){
-			printf(" %2x ",word[i]);
-		}
-	#endif
 	
 	//-------------- XOR with round constant-----------
 	// we don't need more than 10 round constants 
 	// 128 bit key requires 10 roundConstants, 192 bit key variant requires 8 and 256 bit variant requires 7
 	unsigned char rcon[] = {0x01 ,0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36};
-	#ifdef DEBUG
-		printf("\nrcon called with iteration=%d value=%2x\n",iteration, rcon[iteration]);
-	#endif
 	word[0]= rcon[iteration] ^ word[0];
-	#ifdef DEBUG
-	printf("\nAfter round constant..");
-		for(i=0;i<4;i++){
-			printf(" %2x ",word[i]);
-		}
-	#endif
-	printf("\n");
 	
 }
 /**********************************************************/
-// n = number of bytes in a key . A word has 4 bytes so 16 bits. 
+// n = number of bytes in a key .
 // n =16 for 128 bit key, 24 for 192 bit key and 32 for 256 bit key
+/*
+ *	Input: 
+ *	key: user specified key 
+ *	expandedKey: array of unsigned chars for expanded key 
+ *				NOTE: function does not check the size of expandedKey
+ *						It should be according to n
+ *						if n = 16 size of expandedKey >= 176
+ *						if n = 24 size of expandedKey >= 208
+ *						if n = 32 size of expandedKey >= 240
+ *	n = size of key (in bytes)
+ *	Output:
+ *	void, function works on expandedKey  
+*/
 void keyExpansion(unsigned char key[], unsigned char expandedKey[], const int n){
 	int rounds = n/4 +6;// rounds = number of rounds 
 	int sizeExpandedKey = 16*(rounds+1);// expected size of expandedKey
@@ -89,9 +88,6 @@ void keyExpansion(unsigned char key[], unsigned char expandedKey[], const int n)
 	//-------------- First n bytes of expanded key are same as those of original key, so copy--------------
 	for(i=0;i<n;i++){
 		expandedKey[i]= key[i];	
-		#ifdef DEBUG2
-			printf("\nCopying to expandedKey %d, value= %2x , key = %2x",i,expandedKey[i], key[i]);
-		#endif
 	}
 	sizeCurrent = n;// we already have n bytes in the expanded key 
 	
@@ -104,13 +100,6 @@ void keyExpansion(unsigned char key[], unsigned char expandedKey[], const int n)
 		// apply g every n bytes 
 		if(sizeCurrent % n ==0){
 			g(tmp, iteration);
-			#ifdef DEBUG2
-                            printf("\nAfter Schedule core.. ");
-                            for(i=0;i<4;i++){
-                                printf(" %2x ", tmp[i]);
-                            }
-                         #endif
-    	       	    	 
 			iteration++;
 
 		}
@@ -126,20 +115,13 @@ void keyExpansion(unsigned char key[], unsigned char expandedKey[], const int n)
 			expandedKey[sizeCurrent] = expandedKey[sizeCurrent - n] ^ tmp[i];
 			sizeCurrent++;
 		}
-		#ifdef DEBUG2
-                    printf("\nAfter one iteration of loop....");
-                            for(i=0;i<4;i++){
-                                printf(" %2x ", expandedKey[sizeCurrent-4+i]);
-                            }
-                    #endif
-                   
 	}
 }
 /**********************************************************/
 int main(){
-	unsigned char key[]={0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+	unsigned char key128[]={0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 						 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
-	unsigned char expandedKey[176];
+	unsigned char expandedKey128[176];
 	unsigned char key192[]={0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
 							0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 							0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
@@ -151,8 +133,24 @@ int main(){
 						};
 	unsigned char expandedKey256[240];
 	int i,j;
-	//keyExpansion(key, expandedKey, 16);
+	keyExpansion(key128, expandedKey128, 16);
+	keyExpansion(key192, expandedKey192, 24);
 	keyExpansion(key256, expandedKey256, 32);
+	printf("\nKey expansion for 128 bit key......\n");
+	for(i=0;i<11;i++){
+		for(j=0;j<16;j++){
+			printf(" %2x ", expandedKey128[i*16 + j]);
+		}
+		printf("\n");
+	}
+	printf("\nKey expansion for 192 bit key.....\n");
+	for(i=0;i<13;i++){
+		for(j=0;j<16;j++){
+			printf(" %2x ", expandedKey192[i*16 + j]);
+		}
+		printf("\n");
+	}
+	printf("\nKey expansion for 256 bit key.....\n");
 	for(i=0;i<15;i++){
 		for(j=0;j<16;j++){
 			printf(" %2x ", expandedKey256[i*16 + j]);
